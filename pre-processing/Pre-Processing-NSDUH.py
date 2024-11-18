@@ -44,7 +44,7 @@ columns_to_keep = [
 combined_SPD_data = df_pandas[columns_to_keep]
 
 # Export the filtered data to a CSV file
-combined_SPD_data.to_csv("years2004to2022_SPD_data_filtered.csv", index=False, header=True)
+combined_SPD_data.to_csv("NSDUH_2004to2022.csv", index=False, header=True)
 
 # print(df_pandas)
 # Summary Statistics
