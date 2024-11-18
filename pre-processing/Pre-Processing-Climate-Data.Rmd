@@ -1,0 +1,234 @@
+---
+title: "Untitled"
+author: "Sarah Fullerton"
+date: "2024-09-28"
+output: html_document
+---
+THIS IS WORKING WIHT SOURCE [8] FROM THESIS OUTLINE
+```{r}
+library(dplyr)
+```
+
+```{r}
+# Load the CSV into R
+disaster_data <- read.csv("[8]1_incidenttype_state_declarationdate_1953_2023.csv")
+disaster_data
+
+# Use distinct to view unique values in 'incident_type'
+unique_incident_types <- disaster_data |>
+  distinct(incident_type)
+
+# Print the unique incident types
+print(unique_incident_types)
+
+# Define a vector of natural disaster types
+natural_disasters <- c("Tornado", "Flood", "Fire", "Earthquake", "Hurricane",
+                        "Volcanic Eruption", "Severe Storm", "Drought", 
+                        "Dam/Levee Break", "Snowstorm", "Severe Ice Storm",
+                        "Coastal Storm", "Mud/Landslide", "Tsunami", 
+                        "Tropical Storm", "Winter Storm")
+#filter to only include natural disasters:
+natural_disaster_data <- disaster_data %>%
+  filter(incident_type %in% natural_disasters)
+natural_disaster_data
+write.csv(natural_disaster_data, "natural_disaster_data.csv", row.names = FALSE)
+
+# Count the number of occurrences of each incident type
+incident_count <- natural_disaster_data %>%
+  count(incident_type, sort = TRUE)
+
+# View the result
+print(incident_count)
+
+tail(natural_disaster_data, 10)
+```
+
+
+VALIDATION OF DATA
+```{r}
+validate_natural_disaster_data <- function(data) {
+  
+  # 1. Summary of the dataset
+  print("Summary of the Dataset:")
+  print(summary(data))
+  
+  # 2. Check for missing values
+  print("Missing Values:")
+  missing_values <- colSums(is.na(data))
+  print(missing_values)
+  
+  # 3. Check for duplicate rows
+  print("Duplicate Rows:")
+  duplicates <- data[duplicated(data), ]
+  if (nrow(duplicates) > 0) {
+    print("Duplicates found:")
+    print(duplicates)
+  } else {
+    print("No duplicate rows found.")
+  }
+  
+  # 4. Check data types (structure of the dataset)
+  print("Data Structure:")
+  print(str(data))
+  
+  # 5. Detect outliers in numeric columns
+  numeric_columns <- c("disaster_number", "fy_declared", "ih_program_declared", 
+                       "ia_program_declared", "pa_program_declared", 
+                       "hm_program_declared", "fips", "place_code", 
+                       "declaration_request_number")
+  
+  for (col in numeric_columns) {
+    print(paste("Outliers in column:", col))
+    outliers <- data |>
+      filter(get(col) < quantile(get(col), 0.05, na.rm = TRUE) | 
+             get(col) > quantile(get(col), 0.95, na.rm = TRUE))
+    print(outliers)
+  }
+  
+  # 6. Check for inconsistent values in categorical variables
+  print("Unique Values in 'state':")
+  print(unique(data$state))
+  
+  print("Unique Values in 'declaration_type':")
+  print(unique(data$declaration_type))
+  
+  print("Unique Values in 'incident_type':")
+  print(unique(data$incident_type))
+}
+
+# Run the validation on natural_disaster_data dataset
+validate_natural_disaster_data(natural_disaster_data)
+```
+
+
+```{r}
+# Step 1: Count the total incidents per year
+incident_counts_per_year <- natural_disaster_data |>
+  group_by(fy_declared) |>
+  summarize(total_incidents = n()) |>
+  arrange(desc(total_incidents))
+
+
+
+# Step 2: Identify the year with the most incidents
+most_incidents_year <- incident_counts_per_year |>
+  slice(1) |>
+  pull(fy_declared)
+
+print(paste("Year with most incidents:", most_incidents_year))
+
+# Step 3: Filter the data for that year and count incidents per state
+incidents_per_state <- natural_disaster_data |>
+  filter(fy_declared == most_incidents_year) |>
+  group_by(state) |>
+  summarize(total_incidents = n()) |> 
+  arrange(desc(total_incidents))
+
+# View the result
+print(incidents_per_state)
+```
+
+```{r}
+library(lubridate)  # for working with dates
+
+# Convert the declaration_date column to Date format
+disaster_data$declaration_date <- ymd_hms(disaster_data$declaration_date)
+
+# Extract the year from the declaration date
+disaster_data$year <- year(disaster_data$declaration_date)
+
+# Step 1: Filter only natural disasters
+natural_disaster_data <- disaster_data %>%
+  filter(incident_type %in% natural_disasters)
+
+# Step 2: Count the number of incidents per disaster type for each year
+disaster_counts <- natural_disaster_data %>%
+  group_by(year, incident_type) %>%
+  summarise(count = n(), .groups = "drop")
+
+# Step 3: Find the disaster type with the highest count for each year
+max_disaster_per_year <- disaster_counts %>%
+  group_by(year) %>%
+  slice_max(count)  # Get the row(s) with the highest count for each year
+
+# View the result
+print(max_disaster_per_year)
+```
+
+
+```{r}
+incident_counts_per_year_per_state <- natural_disaster_data %>%
+  filter(fy_declared > 1989 & fy_declared < 2022) %>%  # Filter for years between 1990 and 2021
+  group_by(fy_declared, state) %>%  # Group by fiscal year and state
+  summarize(total_incidents = n()) %>%  # Count incidents in each group
+  arrange(fy_declared)  # Arrange by fiscal year in ascending order
+
+# View the resulting dataset
+print(incident_counts_per_year_per_state)
+
+# Save to a CSV file
+write.csv(incident_counts_per_year_per_state, "incident_counts_per_year_1990_2021.csv", row.names = FALSE)
+```
+
+```{r}
+incident_counts_per_year_per_state <- natural_disaster_data %>%
+  filter(fy_declared > 1989 & fy_declared < 2022) %>%  # Filter for years between 1990 and 2021
+  group_by(fy_declared, state) %>%  # Group by fiscal year and state
+  summarize(total_incidents = n(), .groups = "drop") %>%  # Count incidents in each group
+  arrange(fy_declared)  # Arrange by fiscal year in ascending order
+
+# Add a column with total incidents for each year across all states
+incident_counts_per_year_per_state <- incident_counts_per_year_per_state %>%
+  group_by(fy_declared) %>%  # Group by fiscal year
+  mutate(total_incidents_per_year = sum(total_incidents)) %>%  # Sum incidents per year
+  ungroup()  # Ungroup to prevent unwanted grouping in future steps
+
+# View the resulting dataset
+print(incident_counts_per_year_per_state)
+
+# Save to a CSV file
+write.csv(incident_counts_per_year_per_state, "with_state_count_incident_counts_per_year_1990_2021.csv", row.names = FALSE)
+```
+
+```{r}
+library(dplyr)
+
+incident_counts_per_year_per_state <- natural_disaster_data %>%
+  #filter(fy_declared > 1989 & fy_declared < 2022) %>%  # Filter for years between 1990 and 2021
+  group_by(fy_declared, state, incident_type) %>%  # Group by fiscal year, state, and incident type
+  summarize(incident_count = n(), .groups = "drop") %>%  # Count incidents for each type in each state and year
+  arrange(fy_declared)  # Arrange by fiscal year in ascending order
+
+# Create a summary of incidents by year, including types and counts per state
+incident_details_per_year <- incident_counts_per_year_per_state %>%
+  group_by(fy_declared, incident_type) %>%
+  summarize(
+    count_per_type = sum(incident_count),  # Total count per incident type across states
+    states_involved = paste(unique(state), collapse = ", "),  # List of states involved
+    .groups = "drop"
+  ) %>%
+  mutate(incident_summary = paste0(incident_type, " (", count_per_type, "): ", states_involved)) %>%  # Create summary text
+  group_by(fy_declared) %>%
+  summarize(incident_details = paste(incident_summary, collapse = "; "), .groups = "drop")  # Combine summaries for each year
+
+# Join the incident details back with the main dataset
+final_data <- incident_counts_per_year_per_state %>%
+  left_join(incident_details_per_year, by = "fy_declared")  # Add incident details to each row
+
+# View the resulting dataset
+print(final_data)
+
+# Save to a CSV file
+write.csv(final_data, "theincident_counts_with_details_1990_2021.csv", row.names = FALSE)
+
+```
+
+
+
+
+
+
+
+
+
+
